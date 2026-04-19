@@ -1,0 +1,31 @@
+name: Register Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        default: 'node-1'
+      owner:
+        default: 'MrViincciLeRoy'
+      repo:
+        default: 'GREASYvideo'
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - run: pip install requests
+    - env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        python scripts/register_worker.py add \
+          --name "${{ github.event.inputs.name }}" \
+          --owner "${{ github.event.inputs.owner }}" \
+          --repo "${{ github.event.inputs.repo }}" \
+          --pat-secret "GH_ORCHESTRATOR_PAT" \
+          --workflow "worker_pipeline.yml"
