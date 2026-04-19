@@ -1,0 +1,49 @@
+name: Cleanup and Finalize
+
+on:
+  push:
+    paths:
+      - 'job_complete.json'
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GH_ORCHESTRATOR_PAT }}
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: pip
+
+    - run: |
+        pip install requests
+        sudo apt-get install -y ffmpeg
+
+    - name: Finalize job
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GH_ORCHESTRATOR_PAT }}
+        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: python scripts/finalize.py
+
+    - name: Delete trigger files and push
+      env:
+        GH_TOKEN: ${{ secrets.GH_ORCHESTRATOR_PAT }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Remove both trigger files
+        git rm --ignore-unmatch active_job.json
+        git rm --ignore-unmatch job_complete.json
+
+        git commit -m "chore: cleanup after job complete" || echo "Nothing to commit"
+        git push
