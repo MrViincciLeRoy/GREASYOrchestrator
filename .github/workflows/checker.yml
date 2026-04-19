@@ -3,6 +3,9 @@ name: Checker
 on:
   schedule:
     - cron: '*/30 * * * *'
+  push:
+    paths:
+      - 'active_job.json'
   workflow_dispatch:
 
 jobs:
@@ -14,6 +17,14 @@ jobs:
     - uses: actions/checkout@v4
       with:
         token: ${{ secrets.GH_ORCHESTRATOR_PAT }}
+
+    - name: Check if active_job.json exists
+      run: |
+        if [ ! -f active_job.json ]; then
+          echo "No active_job.json — idle, exiting"
+          exit 0
+        fi
+        echo "active_job.json found — proceeding"
 
     - uses: actions/setup-python@v5
       with:
