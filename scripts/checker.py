@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Checker script - runs on cron every 30 min.
-Reads active_job.json, respects check_interval_minutes,
-polls Supabase for chunk statuses, commits job_complete.json when done.
+Reads active_job.json, uses job_started_at as the fixed reference point
+so check intervals are always measured from job creation, not from the
+last time this script ran.
 """
 
 import os
@@ -52,23 +53,48 @@ def get_chunks(job_id):
     return r.json()
 
 
-def should_check_now(job):
+def should_check_now(job) -> bool:
     """
-    Returns True if enough time has elapsed since last_checked_at
-    based on check_interval_minutes stored in the job file.
+    Returns True when the next check window has been reached.
+
+    Uses job_started_at as the fixed origin so intervals are always
+    measured from job creation, not from whenever the last cron tick
+    happened to update last_checked_at.
+
+    Logic:
+      - elapsed_minutes = now - job_started_at
+      - due_check_number = floor(elapsed_minutes / interval)  (1-based: first check due at T+interval)
+      - checks_completed = how many checks we've already done
+      - act if due_check_number > checks_completed
     """
     interval = job.get("check_interval_minutes", 30)
-    last_checked = job.get("last_checked_at")
+    started_at_raw = job.get("job_started_at") or job.get("created_at")
+    checks_completed = job.get("checks_completed", 0)
 
-    if not last_checked:
+    if not started_at_raw:
+        log("No job_started_at found — checking immediately")
         return True
 
-    last_dt = datetime.fromisoformat(last_checked.replace("Z", "+00:00"))
+    started_dt = datetime.fromisoformat(started_at_raw.replace("Z", "+00:00"))
     now = datetime.now(timezone.utc)
-    elapsed_minutes = (now - last_dt).total_seconds() / 60
+    elapsed_minutes = (now - started_dt).total_seconds() / 60
+    due_check_number = int(elapsed_minutes // interval)
 
-    log(f"Interval: {interval}m | Elapsed since last check: {elapsed_minutes:.1f}m")
-    return elapsed_minutes >= interval
+    log(f"Started at     : {started_dt.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    log(f"Elapsed        : {elapsed_minutes:.1f}m")
+    log(f"Interval       : {interval}m")
+    log(f"Checks due     : {due_check_number} | Checks done: {checks_completed}")
+
+    if due_check_number > checks_completed:
+        log(f"✓ Check #{checks_completed + 1} is due — proceeding")
+        return True
+
+    next_check_at = started_dt.total_seconds() if False else None
+    from datetime import timedelta
+    next_due = started_dt + timedelta(minutes=(checks_completed + 1) * interval)
+    minutes_until_next = (next_due - now).total_seconds() / 60
+    log(f"Next check due : {next_due.strftime('%H:%M:%S UTC')} (~{minutes_until_next:.0f}m from now)")
+    return False
 
 
 def commit_and_push(files, message):
@@ -91,7 +117,6 @@ def commit_and_push(files, message):
 def main():
     log("Checker started")
 
-    # No active job → nothing to do
     job = load_active_job()
     if not job:
         log("No active_job.json found — idle, exiting")
@@ -100,7 +125,6 @@ def main():
     log(f"Active job: {job['job_id']} | Series: {job.get('series_url', '?')}")
     log(f"Total chapters: {job.get('total_chapters', '?')}")
 
-    # Check if enough time has elapsed
     if not should_check_now(job):
         log("Not yet time to check — exiting silently")
         return
@@ -118,14 +142,13 @@ def main():
 
     log(f"Chunks → total={total} done={done} running={running} failed={failed} pending={pending}")
 
-    # Update last_checked_at
+    # Increment checks_completed and update last_checked_at
+    job["checks_completed"] = job.get("checks_completed", 0) + 1
     job["last_checked_at"] = datetime.now(timezone.utc).isoformat()
 
     if done + failed == total and total > 0:
-        # All chunks finished
         log(f"Job complete! done={done} failed={failed}")
 
-        # Write job_complete.json — this triggers the cleanup workflow
         complete_data = {
             "job_id": job_id,
             "season_name": job.get("season_name", "unknown"),
@@ -139,7 +162,6 @@ def main():
         with open(COMPLETE_FILE, "w") as f:
             json.dump(complete_data, f, indent=2)
 
-        # Save updated active_job too (with last_checked_at)
         save_active_job(job)
 
         commit_and_push(
@@ -149,12 +171,11 @@ def main():
         log("job_complete.json committed — cleanup workflow will trigger")
 
     else:
-        # Still running — just update last_checked_at and push
-        log("Job still in progress — updating last_checked_at")
+        log("Job still in progress — updating check counter")
         save_active_job(job)
         commit_and_push(
             [ACTIVE_JOB_FILE],
-            f"chore: checker update — done={done}/{total}"
+            f"chore: checker #{job['checks_completed']} — done={done}/{total}"
         )
 
     log("Checker done")

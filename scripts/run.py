@@ -54,6 +54,10 @@ def main():
 
     check_interval = get_check_interval(args.total_chapters)
 
+    # Use the time set by orchestrate.yml when the workflow step started
+    # Falls back to now() only if run outside the workflow
+    job_started_at = os.environ.get("JOB_STARTED_AT") or datetime.now(timezone.utc).isoformat()
+
     print(f"\n{'='*60}")
     print(f"🎬 GREASY ORCHESTRATOR")
     print(f"{'='*60}")
@@ -62,6 +66,7 @@ def main():
     print(f"Chapters       : {args.start_chapter} → {args.start_chapter + args.total_chapters - 1}")
     print(f"Total          : {args.total_chapters}")
     print(f"Check interval : every {check_interval}m")
+    print(f"Job started at : {job_started_at}")
 
     workers = get_available_workers()
     if not workers:
@@ -129,8 +134,10 @@ def main():
         "start_chapter": args.start_chapter,
         "total_chapters": args.total_chapters,
         "check_interval_minutes": check_interval,
+        "job_started_at": job_started_at,       # exact time orchestrate.yml ran
+        "checks_completed": 0,                   # incremented each time checker acts
         "last_checked_at": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": job_started_at,
         "workers_triggered": triggered
     }
 
@@ -142,6 +149,7 @@ def main():
     print(f"Job ID         : {job_id}")
     print(f"Workers        : {triggered} triggered")
     print(f"Checker runs   : every 30m (acts every {check_interval}m)")
+    print(f"Job started at : {job_started_at}")
     print(f"active_job.json committed to repo")
 
 

@@ -48,7 +48,11 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GH_ORCHESTRATOR_PAT }}
         GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         GITHUB_REPOSITORY: ${{ github.repository }}
+        JOB_STARTED_AT: ${{ github.event.repository.updated_at }}
       run: |
+        JOB_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        export JOB_STARTED_AT
+
         python scripts/run.py \
           --season "${{ github.event.inputs.season_name }}" \
           --series-url "${{ github.event.inputs.series_url }}" \
