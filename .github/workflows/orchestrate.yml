@@ -1,0 +1,55 @@
+name: Orchestrate Season
+
+on:
+  workflow_dispatch:
+    inputs:
+      season_name:
+        description: 'Season name (used for release tag)'
+        required: true
+        default: 'Knight_King_S1'
+      chapters:
+        description: 'Comma-separated PDF filenames (must exist in worker data/ folders)'
+        required: true
+      max_workers:
+        description: 'Max workers to use (0 = all available)'
+        required: false
+        default: '0'
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: pip
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        sudo apt-get install -y ffmpeg
+
+    - name: Run orchestrator
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GH_ORCHESTRATOR_PAT }}
+        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: |
+        python scripts/run.py \
+          --season "${{ github.event.inputs.season_name }}" \
+          --chapters "${{ github.event.inputs.chapters }}" \
+          --workers ${{ github.event.inputs.max_workers }} \
+          --output-dir final_output
+
+    - name: Upload final video artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.inputs.season_name }}-final
+        path: final_output/*.mp4
+        retention-days: 90
