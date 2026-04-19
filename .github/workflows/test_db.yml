@@ -1,0 +1,35 @@
+name: Test DB Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - run: pip install requests
+    - name: Test Supabase connection
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        python - <<'EOF'
+        import os, requests, sys
+
+        URL = os.environ['SUPABASE_URL']
+        KEY = os.environ['SUPABASE_KEY']
+        H = {'apikey': KEY, 'Authorization': f'Bearer {KEY}'}
+
+        r = requests.get(f"{URL}/rest/v1/workers", headers=H, params={'select': '*'})
+        print(f"Status: {r.status_code}")
+        r.raise_for_status()
+
+        workers = r.json()
+        print(f"✓ Connected — {len(workers)} worker(s)")
+        for w in workers:
+            print(f"  {w.get('id')} | {w.get('name')} | {w.get('status')}")
+        EOF
