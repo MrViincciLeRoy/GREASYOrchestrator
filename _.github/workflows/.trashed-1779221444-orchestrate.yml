@@ -4,20 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       season_name:
-        description: 'Season name (used for release tag e.g. Knight_King_S1)'
+        description: 'Season name (used for release tag)'
         required: true
         default: 'Knight_King_S1'
-      series_url:
-        description: 'AsuraComics series URL (e.g. asuracomic.net/series/the-knight-king)'
+      chapters:
+        description: 'Comma-separated PDF filenames (must exist in worker data/ folders)'
         required: true
-      total_chapters:
-        description: 'Total number of chapters to process'
-        required: true
-        default: '10'
-      start_chapter:
-        description: 'First chapter number to start from'
-        required: false
-        default: '1'
       max_workers:
         description: 'Max workers to use (0 = all available)'
         required: false
@@ -43,7 +35,6 @@ jobs:
 
     - name: Run orchestrator
       env:
-        PYTHONPATH: ${{ github.workspace }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         GITHUB_TOKEN: ${{ secrets.GH_ORCHESTRATOR_PAT }}
@@ -52,9 +43,7 @@ jobs:
       run: |
         python scripts/run.py \
           --season "${{ github.event.inputs.season_name }}" \
-          --series-url "${{ github.event.inputs.series_url }}" \
-          --total-chapters ${{ github.event.inputs.total_chapters }} \
-          --start-chapter ${{ github.event.inputs.start_chapter }} \
+          --chapters "${{ github.event.inputs.chapters }}" \
           --workers ${{ github.event.inputs.max_workers }} \
           --output-dir final_output
 

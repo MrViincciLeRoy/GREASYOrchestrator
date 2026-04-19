@@ -1,23 +1,34 @@
-def split_chapters(chapter_files, workers):
-    total = len(chapter_files)
+def split_chapters(total_chapters: int, workers: list, start_chapter: int = 1) -> list:
+    """
+    Split chapter range across available workers.
+
+    Args:
+        total_chapters: Total number of chapters to process
+        workers: List of worker dicts from DB
+        start_chapter: First chapter number (default 1)
+
+    Returns:
+        List of dicts: {worker, start_chapter, end_chapter, chapter_count}
+    """
     n = len(workers)
-    base = total // n
-    remainder = total % n
+    base = total_chapters // n
+    remainder = total_chapters % n
 
     chunks = []
-    start = 0
+    current = start_chapter
 
     for i, worker in enumerate(workers):
         size = base + (1 if i < remainder else 0)
-        end = start + size
-        files = chapter_files[start:end]
+        if size == 0:
+            continue
 
+        end = current + size - 1
         chunks.append({
-            'worker': worker,
-            'chapter_files': files,
-            'start_chapter': start + 1,
-            'end_chapter': end
+            "worker": worker,
+            "start_chapter": current,
+            "end_chapter": end,
+            "chapter_count": size
         })
-        start = end
+        current = end + 1
 
     return chunks
