@@ -26,7 +26,7 @@ jobs:
         import os, requests
         url = os.environ['SUPABASE_URL']
         key = os.environ['SUPABASE_KEY']
-        h = {'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
+        H = {'apikey': key, 'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'}
         r = requests.patch(f"{url}/rest/v1/workers", headers=H,
             json={'status': 'idle', 'current_job_id': None},
             params={'status': 'eq.busy'})
