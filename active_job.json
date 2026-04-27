@@ -6,8 +6,8 @@
   "total_chapters": 1,
   "check_interval_minutes": 30,
   "job_started_at": "2026-04-27T14:02:40Z",
-  "checks_completed": 14,
-  "last_checked_at": "2026-04-27T21:33:39.676729+00:00",
+  "checks_completed": 15,
+  "last_checked_at": "2026-04-27T21:33:50.878118+00:00",
   "created_at": "2026-04-27T14:02:40Z",
   "workers_triggered": 1
 }
